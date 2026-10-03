@@ -165,6 +165,8 @@ a { color: inherit; text-decoration: none; }
 .secondary-actions button { padding: 4px; border: 0; color: #315d43; background: none; font-size: 11px; font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
 .secondary-actions button:hover, .join-links button:hover { color: #d36f4c; }
 .disclaimer { margin: 11px 0 0; color: #879186; font-size: 10px; text-align: center; }
+.payment-note { display: grid; gap: 3px; margin: 0 0 12px; color: #52685a; font-size: 13px; line-height: 1.45; text-align: center; }
+.payment-note strong { color: #214b36; font-size: 16px; }
 .how-section { padding-top: 96px; padding-bottom: 105px; scroll-margin-top: 20px; }
 .how-heading { text-align: center; }
 .how-heading .section-kicker { justify-content: center; }
@@ -193,6 +195,39 @@ a { color: inherit; text-decoration: none; }
 .footer-inner > span { flex: none; color: #929e94; font-size: 10px; white-space: nowrap; }
 .toast { position: fixed; z-index: 20; right: 20px; bottom: 20px; width: min(400px, calc(100vw - 40px)); padding: 13px 15px; border-radius: 11px; color: #eaf4e5; background: #1e4f39; box-shadow: 0 15px 40px #102e1e4d; font-size: 12px; line-height: 1.5; }
 .toast[hidden] { display: none; }
+.payment-dialog { width: min(100% - 28px, 500px); max-width: 500px; max-height: min(90vh, 820px); padding: 0; overflow: auto; border: 0; border-radius: 20px; color: #1b2923; background: #fff; box-shadow: 0 28px 90px #081d1266; }
+.payment-dialog::backdrop { background: #10251bc7; backdrop-filter: blur(3px); }
+.payment-dialog-card { padding: 27px; }
+.payment-dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding-bottom: 17px; border-bottom: 1px solid #e8ede5; }
+.payment-kicker { color: #548065; font-size: 11px; font-weight: 800; letter-spacing: .12em; }
+.payment-dialog-header h2 { margin: 5px 0 0; color: #18392b; font: 750 30px/1.1 Outfit, Arial, sans-serif; letter-spacing: -.04em; }
+.dialog-close { display: grid; width: 42px; height: 42px; flex: none; place-items: center; border: 1px solid #e4eae0; border-radius: 50%; color: #41624d; background: #f8faf5; font-size: 28px; line-height: 1; }
+.payment-panel { padding-top: 19px; }
+.payment-panel[hidden] { display: none; }
+.payment-intro { margin: 0 0 18px; color: #596c5e; font-size: 17px; line-height: 1.55; }
+.payment-intro strong { color: #193f2d; font-size: 20px; }
+#pix-form { display: grid; gap: 9px; }
+#pix-form label, .pix-pending-panel label { margin-top: 5px; color: #294936; font-size: 16px; font-weight: 750; }
+#pix-form input { width: 100%; min-height: 52px; padding: 12px 14px; border: 1.5px solid #cfdacf; border-radius: 10px; color: #1b2923; background: #fff; font-size: 17px; }
+#pix-form input:focus { border-color: #397d52; outline: 3px solid #397d5226; }
+.payment-privacy { margin: 9px 0 4px; color: #77867a; font-size: 13px; line-height: 1.55; }
+.payment-submit { width: 100%; min-height: 54px; margin-top: 9px; font-size: 16px; }
+.button-secondary { border: 1.5px solid #397d52; color: #28573e; background: #f4f8f0; }
+.button-secondary:hover { background: #eaf2e5; }
+.payment-error { margin: 2px 0 0; color: #9a2f32; font-size: 14px; line-height: 1.45; }
+.payment-error[hidden] { display: none; }
+.pix-pending-panel { text-align: center; }
+.pix-qr-image { display: block; width: min(100%, 250px); aspect-ratio: 1; margin: 10px auto 17px; border: 1px solid #e8ede5; border-radius: 12px; background: #fff; image-rendering: pixelated; }
+.pix-qr-image[hidden], #pix-copy-label[hidden], .pix-copy-code[hidden], .pix-copy-button[hidden] { display: none; }
+.pix-pending-panel label { display: block; margin-bottom: 8px; text-align: left; }
+.pix-copy-code { display: block; width: 100%; min-height: 94px; resize: vertical; padding: 11px; border: 1.5px solid #dce5da; border-radius: 9px; color: #405648; background: #f8faf6; font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }
+.pix-status-message { margin: 17px 0 0; color: #28573e; font-size: 16px; font-weight: 750; line-height: 1.45; }
+.pix-check-button { min-height: 46px; margin-top: 11px; padding: 8px 12px; border: 0; color: #315d43; background: transparent; font-size: 15px; font-weight: 750; text-decoration: underline; text-underline-offset: 3px; }
+.pix-approved-panel { text-align: center; }
+.payment-success-icon { display: grid; width: 62px; height: 62px; place-items: center; margin: 3px auto 12px; border-radius: 50%; color: #fff; background: #347d50; font-size: 35px; font-weight: 800; }
+.pix-approved-panel h3 { margin: 0 0 10px; color: #1e4e35; font: 750 25px/1.2 Outfit, Arial, sans-serif; }
+.pix-approved-panel .button-secondary { margin-top: 9px; }
+.pix-approved-panel .button-primary { margin-top: 0; }
 
 @media (max-width: 1050px) {
   .container { width: min(100% - 56px, 1200px); }
@@ -273,6 +308,13 @@ a { color: inherit; text-decoration: none; }
   .president-photo-grid { gap: 5px; }
   .adjustments { margin-top: 13px; }
   .preview-top, .preview-bottom { padding-right: 18px; padding-left: 18px; }
+  .payment-dialog { width: calc(100% - 20px); max-height: 94vh; border-radius: 16px; }
+  .payment-dialog-card { padding: 21px 17px; }
+  .payment-dialog-header h2 { font-size: 27px; }
+  .payment-intro { font-size: 16px; }
+  #pix-form label, .pix-pending-panel label { font-size: 16px; }
+  #pix-form input { min-height: 50px; font-size: 16px; }
+  .pix-qr-image { width: min(100%, 220px); }
   .preview-stage { min-height: 435px; padding: 22px 27px; }
   .preview-stage.is-story { min-height: 510px; }
   .preview-art { width: min(86%, 298px); }

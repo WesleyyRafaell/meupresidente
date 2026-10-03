@@ -19,7 +19,11 @@ const CANDIDATES = [
 ];
 
 const STORAGE_KEY = "meu-presidente:demo-v1";
+const PAYMENT_ORDERS_KEY = "meu-presidente:pix-orders-v1";
 const IMAGE_SIZE_LIMIT = 20 * 1024 * 1024;
+const PAYMENT_POLL_INTERVAL = 5000;
+const PAYMENT_POLL_WINDOW = 5 * 60 * 1000;
+const PAYMENT_API_URL = String(window.MEU_PRESIDENTE_PIX_API_URL || "").replace(/\/+$/, "");
 const ART_WIDTH = 1080;
 const FORMATS = {
   feed: { label: "Feed", width: ART_WIDTH, height: 1350 },
@@ -32,7 +36,12 @@ const elements = Object.fromEntries(
     "candidate-grid", "president-photo-grid", "format-toggle",
     "zoom", "zoom-label", "position", "position-label", "preview-stage",
     "preview-canvas", "preview-title", "preview-subtitle", "download-button",
-    "share-button", "live-status", "toast",
+    "download-label", "share-button", "share-label", "live-status", "toast",
+    "pix-dialog", "pix-close-button", "pix-form", "pix-form-panel", "pix-email",
+    "pix-cpf", "pix-submit-button", "pix-form-error", "pix-pending-panel",
+    "pix-qr-image", "pix-copy-label", "pix-copy-code", "pix-copy-button", "pix-status-message",
+    "pix-expiration", "pix-check-button", "pix-retry-button", "pix-approved-panel",
+    "approved-download-button", "approved-share-button",
   ].map((id) => [id, document.getElementById(id)]),
 );
 
@@ -45,6 +54,11 @@ const state = {
   zoom: 100,
   position: 0,
   noticeTimer: 0,
+  paymentOrders: new Map(),
+  currentCheckout: null,
+  paymentPollTimer: 0,
+  paymentPollStartedAt: 0,
+  paymentPollInFlight: false,
 };
 
 const presidentPhotoCache = new Map();
@@ -88,12 +102,119 @@ function saveState() {
   }
 }
 
+function savePaymentOrders() {
+  try {
+    const recentOrders = Array.from(state.paymentOrders.entries())
+      .slice(-12)
+      .map(([artworkHash, order]) => ({
+        artworkHash,
+        paymentId: order.paymentId || "",
+        idempotencyKey: order.idempotencyKey || "",
+        status: order.status,
+        expiresAt: order.expiresAt || "",
+      }));
+    localStorage.setItem(PAYMENT_ORDERS_KEY, JSON.stringify(recentOrders));
+  } catch {
+    // Payment state is still checked directly by the Worker for this page session.
+  }
+}
+
+function readSavedPaymentOrders() {
+  try {
+    const savedOrders = JSON.parse(localStorage.getItem(PAYMENT_ORDERS_KEY) || "[]");
+    if (!Array.isArray(savedOrders)) return;
+
+    for (const saved of savedOrders.slice(-12)) {
+      if (!/^[a-f0-9]{64}$/.test(saved?.artworkHash || "")) continue;
+      const paymentId = /^\d{1,24}$/.test(saved.paymentId || "") ? saved.paymentId : "";
+      const idempotencyKey = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(saved.idempotencyKey || "")
+        ? saved.idempotencyKey
+        : "";
+      if (!paymentId && !(saved.status === "creating" && idempotencyKey)) continue;
+
+      state.paymentOrders.set(saved.artworkHash, {
+        paymentId,
+        idempotencyKey,
+        status: paymentId ? "needs-check" : "creating",
+        expiresAt: saved.expiresAt || "",
+      });
+    }
+  } catch {
+    // A damaged local record should not stop the photo editor from loading.
+  }
+}
+
 function announce(message) {
   elements["live-status"].textContent = message;
   elements.toast.textContent = message;
   elements.toast.hidden = false;
   window.clearTimeout(state.noticeTimer);
   state.noticeTimer = window.setTimeout(() => { elements.toast.hidden = true; }, 5200);
+}
+
+function setPaymentButtonLabels(unlocked = false) {
+  elements["download-label"].textContent = unlocked ? "Baixar minha arte" : "Baixar por R$ 2";
+  elements["share-label"].textContent = unlocked ? "↗ Compartilhar minha arte" : "↗ Compartilhar por R$ 2";
+}
+
+function markCompositionChanged() {
+  setPaymentButtonLabels(false);
+}
+
+function paymentApiIsConfigured() {
+  try {
+    return new URL(PAYMENT_API_URL).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function normalizeCpf(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function isValidCpf(value) {
+  const cpf = normalizeCpf(value);
+  if (!/^\d{11}$/.test(cpf) || /^(\d)\1{10}$/.test(cpf)) return false;
+
+  for (let digit = 9; digit < 11; digit += 1) {
+    let sum = 0;
+    for (let index = 0; index < digit; index += 1) {
+      sum += Number(cpf[index]) * (digit + 1 - index);
+    }
+    const remainder = (sum * 10) % 11;
+    const expected = remainder === 10 ? 0 : remainder;
+    if (Number(cpf[digit]) !== expected) return false;
+  }
+  return true;
+}
+
+function formatCpfInput(value) {
+  const digits = normalizeCpf(value).slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return digits.slice(0, 3) + "." + digits.slice(3);
+  if (digits.length <= 9) return digits.slice(0, 3) + "." + digits.slice(3, 6) + "." + digits.slice(6);
+  return digits.slice(0, 3) + "." + digits.slice(3, 6) + "." + digits.slice(6, 9) + "-" + digits.slice(9);
+}
+
+async function artworkHash(blob) {
+  const digest = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function pixApiRequest(path, init = {}) {
+  if (!paymentApiIsConfigured()) {
+    throw new Error("O pagamento Pix ainda não foi ativado neste site.");
+  }
+  const response = await fetch(PAYMENT_API_URL + path, {
+    cache: "no-store",
+    ...init,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || "Não foi possível concluir a operação Pix. Tente novamente.");
+  }
+  return data;
 }
 
 function candidateByNumber(number) {
@@ -133,6 +254,7 @@ function renderCandidateGrid() {
       if (state.selected === candidate.number) return;
       state.selected = candidate.number;
       state.presidentPhoto = candidate.presidentPhotos[0];
+      markCompositionChanged();
       saveState();
       ensurePresidentPhotoLoaded(state.presidentPhoto);
       renderAll();
@@ -172,6 +294,7 @@ function renderPresidentPhotoGrid() {
     option.addEventListener("click", () => {
       if (state.presidentPhoto === source) return;
       state.presidentPhoto = source;
+      markCompositionChanged();
       saveState();
       ensurePresidentPhotoLoaded(source);
       renderAll();
@@ -442,6 +565,7 @@ async function loadPhoto(file) {
     if (state.photoObjectUrl) URL.revokeObjectURL(state.photoObjectUrl);
     state.photo = decoded;
     state.photoObjectUrl = URL.createObjectURL(file);
+    markCompositionChanged();
     state.zoom = 100;
     state.position = 0;
     elements["upload-zone"].classList.add("has-photo");
@@ -472,53 +596,354 @@ async function createFinalImage() {
   await document.fonts.ready;
   const canvas = document.createElement("canvas");
   drawArtwork(canvas, { fullSize: true });
-  return { blob: await canvasToBlob(canvas), candidate };
+  return { blob: await canvasToBlob(canvas), candidate, format: state.format };
 }
 
-async function downloadImage() {
-  elements["download-button"].disabled = true;
+function stopPaymentPolling() {
+  window.clearTimeout(state.paymentPollTimer);
+  state.paymentPollTimer = 0;
+}
+
+function showPixForm(message = "") {
+  elements["pix-form-panel"].hidden = false;
+  elements["pix-pending-panel"].hidden = true;
+  elements["pix-approved-panel"].hidden = true;
+  elements["pix-form-error"].textContent = message;
+  elements["pix-form-error"].hidden = !message;
+}
+
+function showPendingPix(order) {
+  elements["pix-form-panel"].hidden = true;
+  elements["pix-pending-panel"].hidden = false;
+  elements["pix-approved-panel"].hidden = true;
+  const hasQr = Boolean(order.qrCodeBase64 && order.qrCode);
+  elements["pix-qr-image"].hidden = !hasQr;
+  elements["pix-copy-label"].hidden = !hasQr;
+  elements["pix-copy-code"].hidden = !hasQr;
+  elements["pix-copy-button"].hidden = !hasQr;
+  if (hasQr) {
+    elements["pix-qr-image"].src = "data:image/png;base64," + order.qrCodeBase64;
+    elements["pix-copy-code"].value = order.qrCode;
+  }
+  elements["pix-status-message"].textContent = hasQr
+    ? "Aguardando a confirmação do pagamento…"
+    : "Verificando o Pix anterior…";
+  elements["pix-check-button"].hidden = false;
+  elements["pix-retry-button"].hidden = true;
+  const expiration = new Date(order.expiresAt);
+  elements["pix-expiration"].textContent = Number.isNaN(expiration.getTime())
+    ? ""
+    : "Este Pix vence em " + expiration.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) + ".";
+}
+
+function showApprovedPix() {
+  elements["pix-form-panel"].hidden = true;
+  elements["pix-pending-panel"].hidden = true;
+  elements["pix-approved-panel"].hidden = false;
+  setPaymentButtonLabels(true);
+  announce("Pix confirmado. Download e compartilhamento liberados para esta montagem.");
+}
+
+function showPixDialog(artifact) {
+  if (!paymentApiIsConfigured()) {
+    announce("O pagamento Pix ainda não foi ativado. Configure o backend para liberar o download e o compartilhamento.");
+    return false;
+  }
+
+  state.currentCheckout = { artifact };
+  let order = state.paymentOrders.get(artifact.hash);
+
+  if (order?.status === "approved") {
+      showApprovedPix();
+  } else if (order?.paymentId && ["pending", "needs-check"].includes(order.status)) {
+    showPendingPix(order);
+  } else {
+    if (order && ["rejected", "cancelled", "expired", "refunded", "charged_back"].includes(order.status)) {
+      state.paymentOrders.delete(artifact.hash);
+      savePaymentOrders();
+      order = null;
+    }
+    showPixForm();
+  }
+
+  if (!elements["pix-dialog"].open) elements["pix-dialog"].showModal();
+  if (order?.paymentId && ["pending", "needs-check"].includes(order.status)) startPaymentPolling(artifact.hash);
+  return true;
+}
+
+function scheduleNextPaymentCheck(hash) {
+  if (!elements["pix-dialog"].open || state.currentCheckout?.artifact.hash !== hash) return;
+  if (Date.now() - state.paymentPollStartedAt >= PAYMENT_POLL_WINDOW) {
+    elements["pix-status-message"].textContent = "Ainda não conseguimos confirmar. Se você já pagou, toque em “Já paguei, verificar agora”.";
+    return;
+  }
+  window.clearTimeout(state.paymentPollTimer);
+  state.paymentPollTimer = window.setTimeout(() => checkPixPayment(hash), PAYMENT_POLL_INTERVAL);
+}
+
+async function checkPixPayment(hash) {
+  if (state.paymentPollInFlight || state.currentCheckout?.artifact.hash !== hash) return;
+  const order = state.paymentOrders.get(hash);
+  if (!order?.paymentId) return;
+
+  state.paymentPollInFlight = true;
+  let scheduleAgain = false;
+  try {
+    const query = new URLSearchParams({ paymentId: order.paymentId, artworkHash: hash });
+    const result = await pixApiRequest("/api/pix/status?" + query.toString());
+    if (state.currentCheckout?.artifact.hash !== hash) return;
+
+    if (result.approved && result.status === "approved") {
+      order.status = "approved";
+      state.paymentOrders.set(hash, order);
+      savePaymentOrders();
+      stopPaymentPolling();
+      showApprovedPix();
+      return;
+    }
+
+    if (["rejected", "cancelled", "expired", "refunded", "charged_back"].includes(result.status)) {
+      order.status = result.status;
+      state.paymentOrders.set(hash, order);
+      savePaymentOrders();
+      stopPaymentPolling();
+      elements["pix-status-message"].textContent = "Este Pix não foi aprovado. Você pode gerar uma nova cobrança.";
+      elements["pix-check-button"].hidden = true;
+      elements["pix-retry-button"].hidden = false;
+      return;
+    }
+
+    order.status = "pending";
+    order.qrCode = result.qrCode || order.qrCode || "";
+    order.qrCodeBase64 = result.qrCodeBase64 || order.qrCodeBase64 || "";
+    order.expiresAt = result.expiresAt || order.expiresAt || "";
+    state.paymentOrders.set(hash, order);
+    savePaymentOrders();
+    showPendingPix(order);
+    elements["pix-status-message"].textContent = result.status === "in_process"
+      ? "O banco está processando o pagamento. Vamos verificar novamente."
+      : "Aguardando a confirmação do pagamento…";
+    scheduleAgain = true;
+  } catch (error) {
+    if (state.currentCheckout?.artifact.hash === hash) {
+      elements["pix-status-message"].textContent = error.message || "Não foi possível verificar agora. Tentaremos novamente.";
+      scheduleAgain = true;
+    }
+  } finally {
+    state.paymentPollInFlight = false;
+    if (scheduleAgain) scheduleNextPaymentCheck(hash);
+  }
+}
+
+function startPaymentPolling(hash) {
+  stopPaymentPolling();
+  state.paymentPollStartedAt = Date.now();
+  checkPixPayment(hash);
+}
+
+async function createPixPayment(event) {
+  event.preventDefault();
+  const checkout = state.currentCheckout;
+  if (!checkout) return;
+
+  const email = elements["pix-email"].value.trim();
+  const cpf = normalizeCpf(elements["pix-cpf"].value);
+  if (!elements["pix-form"].reportValidity()) return;
+  if (!isValidCpf(cpf)) {
+    showPixForm("Confira o CPF informado.");
+    elements["pix-cpf"].focus();
+    return;
+  }
+
+  const hash = checkout.artifact.hash;
+  let order = state.paymentOrders.get(hash);
+  if (!order || !order.idempotencyKey) {
+    order = { status: "creating", idempotencyKey: crypto.randomUUID() };
+  } else {
+    order.status = "creating";
+  }
+  state.paymentOrders.set(hash, order);
+  savePaymentOrders();
+  elements["pix-submit-button"].disabled = true;
+  elements["pix-submit-button"].textContent = "Gerando Pix…";
+  elements["pix-form-error"].hidden = true;
+
+  try {
+    const result = await pixApiRequest("/api/pix/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        cpf,
+        artworkHash: hash,
+        idempotencyKey: order.idempotencyKey,
+      }),
+    });
+    order = {
+      ...order,
+      paymentId: result.paymentId,
+      status: result.status === "approved" ? "approved" : "pending",
+      qrCode: result.qrCode,
+      qrCodeBase64: result.qrCodeBase64,
+      expiresAt: result.expiresAt,
+    };
+    state.paymentOrders.set(hash, order);
+    savePaymentOrders();
+    if (order.status === "approved") {
+      showApprovedPix();
+    } else {
+      showPendingPix(order);
+      startPaymentPolling(hash);
+    }
+  } catch (error) {
+    showPixForm(error.message || "Não foi possível gerar o Pix. Tente novamente.");
+  } finally {
+    elements["pix-submit-button"].disabled = false;
+    elements["pix-submit-button"].textContent = "Gerar Pix de R$ 2";
+  }
+}
+
+function downloadBlob(blob, artifact) {
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = "meu-presidente-" + artifact.candidate.number + "-" + artifact.format + ".png";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 2000);
+}
+
+async function fetchApprovedArtwork(artifact, order) {
+  const response = await fetch(PAYMENT_API_URL + "/api/pix/export", {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "image/png",
+      "X-Payment-Id": order.paymentId,
+      "X-Artwork-Hash": artifact.hash,
+    },
+    body: artifact.blob,
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 402 || response.status === 403) {
+      order.status = "rejected";
+      savePaymentOrders();
+      setPaymentButtonLabels(false);
+    }
+    throw new Error(data.error || "Não foi possível exportar a imagem. Tente novamente.");
+  }
+  return response.blob();
+}
+
+async function performPaidAction(action, artifact, order) {
+  const verifiedBlob = await fetchApprovedArtwork(artifact, order);
+  if (action === "share" && navigator.share && navigator.canShare) {
+    const fileName = "meu-presidente-" + artifact.candidate.number + "-" + artifact.format + ".png";
+    const file = new File([verifiedBlob], fileName, { type: "image/png" });
+    if (navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: "Minha arte · " + artifact.candidate.name,
+          text: "Minha escolha, do meu jeito.",
+        });
+        announce("Arte pronta para compartilhar.");
+        return true;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return false;
+      }
+    }
+  }
+
+  downloadBlob(verifiedBlob, artifact);
+  announce(action === "share"
+    ? "Arte baixada. Compartilhe pelo aplicativo que preferir."
+    : "Arte " + FORMATS[artifact.format].label + " baixada em PNG.");
+  return true;
+}
+
+async function handleProtectedAction(action) {
+  const button = action === "download" ? elements["download-button"] : elements["share-button"];
+  button.disabled = true;
   try {
     const result = await createFinalImage();
     if (!result) return;
-    const objectUrl = URL.createObjectURL(result.blob);
-    const link = document.createElement("a");
-    link.href = objectUrl;
-    link.download = `meu-presidente-${result.candidate.number}-${state.format}.png`;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-    announce(`Arte ${FORMATS[state.format].label} baixada em PNG. Agora você pode compartilhar!`);
-  } catch {
-    announce("Não foi possível exportar a imagem. Tente novamente.");
+    const artifact = { ...result, hash: await artworkHash(result.blob) };
+    const order = state.paymentOrders.get(artifact.hash);
+
+    if (order?.status === "approved") {
+      setPaymentButtonLabels(true);
+      await performPaidAction(action, artifact, order);
+      return;
+    }
+    if (order && ["rejected", "cancelled", "expired", "refunded", "charged_back"].includes(order.status)) {
+      state.paymentOrders.delete(artifact.hash);
+      savePaymentOrders();
+    }
+    showPixDialog(artifact);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") return;
+    announce(error.message || "Não foi possível preparar a imagem. Tente novamente.");
   } finally {
+    button.disabled = false;
     updatePreview();
   }
 }
 
-async function shareImage() {
-  if (!navigator.share || !navigator.canShare) {
-    await downloadImage();
-    if (!navigator.share) announce("Arte baixada. Compartilhe pelo aplicativo que preferir.");
+async function performApprovedDialogAction(action) {
+  const checkout = state.currentCheckout;
+  if (!checkout) return;
+  const button = action === "download"
+    ? elements["approved-download-button"]
+    : elements["approved-share-button"];
+  const order = state.paymentOrders.get(checkout.artifact.hash);
+  if (!order?.paymentId || order.status !== "approved") {
+    announce("Não foi possível confirmar a liberação. Verifique o Pix novamente.");
     return;
   }
-  elements["share-button"].disabled = true;
+
+  button.disabled = true;
   try {
-    const { blob, candidate } = await createFinalImage();
-    if (!blob) return;
-    const file = new File([blob], `meu-presidente-${candidate.number}-${state.format}.png`, { type: "image/png" });
-    if (!navigator.canShare({ files: [file] })) {
-      await downloadImage();
-      return;
-    }
-    await navigator.share({ files: [file], title: `Minha arte · ${candidate.name}`, text: "Minha escolha, do meu jeito." });
-    announce("Arte pronta para compartilhar.");
+    const succeeded = await performPaidAction(action, checkout.artifact, order);
+    if (succeeded && elements["pix-dialog"].open) elements["pix-dialog"].close();
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") return;
-    announce("Não foi possível compartilhar. Baixe a arte e compartilhe pelo seu aplicativo favorito.");
+    if (order.status === "rejected") {
+      showPixForm("Não foi possível validar este pagamento. Você pode gerar um novo Pix para a montagem.");
+    }
+    announce(error.message || "Não foi possível exportar a imagem. Tente novamente.");
   } finally {
-    elements["share-button"].disabled = false;
+    button.disabled = false;
   }
+}
+
+async function copyPixCode() {
+  const code = elements["pix-copy-code"].value;
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(code);
+    } else {
+      elements["pix-copy-code"].focus();
+      elements["pix-copy-code"].select();
+      if (!document.execCommand("copy")) throw new Error("copy-failed");
+    }
+    elements["pix-status-message"].textContent = "Código Pix copiado. Cole no aplicativo do seu banco.";
+  } catch {
+    elements["pix-copy-code"].focus();
+    elements["pix-copy-code"].select();
+    elements["pix-status-message"].textContent = "Selecione e copie o código para colar no aplicativo do seu banco.";
+  }
+}
+
+function retryPixPayment() {
+  const hash = state.currentCheckout?.artifact.hash;
+  if (!hash) return;
+  state.paymentOrders.delete(hash);
+  savePaymentOrders();
+  stopPaymentPolling();
+  showPixForm("Gere um novo Pix de R$ 2 para esta montagem.");
 }
 
 elements["photo-input"].addEventListener("change", (event) => loadPhoto(event.currentTarget.files?.[0]));
@@ -537,25 +962,44 @@ elements["format-toggle"].addEventListener("click", (event) => {
   const button = event.target.closest("[data-format]");
   if (!button) return;
   state.format = button.dataset.format;
+  markCompositionChanged();
   saveState();
   renderAll();
 });
 elements.zoom.addEventListener("input", () => {
   state.zoom = Number(elements.zoom.value);
+  markCompositionChanged();
   renderFormatButtons();
   updatePreview();
 });
 elements.zoom.addEventListener("change", saveState);
 elements.position.addEventListener("input", () => {
   state.position = Number(elements.position.value);
+  markCompositionChanged();
   renderFormatButtons();
   updatePreview();
 });
 elements.position.addEventListener("change", saveState);
-elements["download-button"].addEventListener("click", downloadImage);
-elements["share-button"].addEventListener("click", shareImage);
+elements["download-button"].addEventListener("click", () => handleProtectedAction("download"));
+elements["share-button"].addEventListener("click", () => handleProtectedAction("share"));
+elements["pix-form"].addEventListener("submit", createPixPayment);
+elements["pix-cpf"].addEventListener("input", (event) => {
+  event.currentTarget.value = formatCpfInput(event.currentTarget.value);
+});
+elements["pix-copy-button"].addEventListener("click", copyPixCode);
+elements["pix-check-button"].addEventListener("click", () => {
+  if (!state.currentCheckout) return;
+  state.paymentPollStartedAt = Date.now();
+  checkPixPayment(state.currentCheckout.artifact.hash);
+});
+elements["pix-retry-button"].addEventListener("click", retryPixPayment);
+elements["pix-close-button"].addEventListener("click", () => elements["pix-dialog"].close());
+elements["pix-dialog"].addEventListener("close", stopPaymentPolling);
+elements["approved-download-button"].addEventListener("click", () => performApprovedDialogAction("download"));
+elements["approved-share-button"].addEventListener("click", () => performApprovedDialogAction("share"));
 
 readSavedState();
+readSavedPaymentOrders();
 if (state.presidentPhoto) ensurePresidentPhotoLoaded(state.presidentPhoto);
 renderAll();
 window.addEventListener("beforeunload", () => {

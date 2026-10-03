@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f8f7f2" />
-    <meta name="description" content="Crie grátis uma arte com a sua foto, moldura e candidato à Presidência da sua escolha." />
+    <meta name="description" content="Monte uma prévia com sua foto e seu candidato. Libere o download e o compartilhamento da arte por Pix." />
     <title>Meu Presidente — Sua foto, sua escolha</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -30,7 +30,7 @@
       <section class="hero container" aria-labelledby="hero-title">
         <div class="hero-copy">
           <h1 id="hero-title">Poste uma foto.<br />Com o seu.<br /><span>Presidente.</span></h1>
-          <p class="hero-description">Monte uma arte com sua foto e a foto do seu candidato à Presidência. Deixe claro sua intenção de voto e ajude a campanha do seu presidente.</p>
+          <p class="hero-description">Monte uma prévia com sua foto e a foto do candidato à Presidência que você escolheu. Depois, libere o download e o compartilhamento da arte por Pix.</p>
           <div class="hero-actions">
             <a class="button button-dark" href="#criar">Criar minha arte <span aria-hidden="true">↗</span></a>
           </div>
@@ -62,7 +62,7 @@
 
               <div class="editor-divider"></div>
               <section class="field-group" aria-labelledby="upload-title">
-                <div class="field-title"><span class="step-number">01</span><div><h4 id="upload-title">Sua foto</h4><p>A imagem é processada no seu navegador.</p></div></div>
+                <div class="field-title"><span class="step-number">01</span><div><h4 id="upload-title">Sua foto</h4><p>A arte é montada no navegador. A imagem só é enviada após o Pix aprovado.</p></div></div>
                 <input id="photo-input" class="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" />
                 <button id="upload-zone" class="upload-zone" type="button">
                   <span class="upload-icon" aria-hidden="true">↑</span>
@@ -100,8 +100,9 @@
               <div id="preview-stage" class="preview-stage"><span class="preview-ring ring-one"></span><span class="preview-ring ring-two"></span><div class="preview-art"><canvas id="preview-canvas" class="preview-canvas" aria-label="Prévia da arte personalizada"></canvas></div><span class="stage-star star-one" aria-hidden="true">✳</span><span class="stage-star star-two" aria-hidden="true">✳</span></div>
               <div class="preview-bottom">
                 <div class="preview-summary"><span class="summary-icon" aria-hidden="true">✦</span><span><strong id="preview-title">Uma arte feita por você</strong><small id="preview-subtitle">Adicione uma foto para começar.</small></span></div>
-                <button id="download-button" class="button button-primary checkout-button" type="button" disabled>Baixar minha arte <span aria-hidden="true">↓</span></button>
-                <div class="secondary-actions"><button id="share-button" type="button" disabled>↗ Compartilhar</button></div>
+                <p class="payment-note"><strong>R$ 2 por arte</strong><span>Um Pix libera baixar e compartilhar esta montagem.</span></p>
+                <button id="download-button" class="button button-primary checkout-button" type="button" disabled><span id="download-label">Baixar por R$ 2</span><span aria-hidden="true">↓</span></button>
+                <div class="secondary-actions"><button id="share-button" type="button" disabled><span id="share-label">↗ Compartilhar por R$ 2</span></button></div>
                 <p class="disclaimer">Criação pessoal. Não é comprovante de voto.</p>
               </div>
             </section>
@@ -109,12 +110,57 @@
         </div>
       </section>
 
-      <section class="how-section container" id="como-funciona" aria-labelledby="how-title"><div class="how-heading"><div class="section-kicker"><span class="tiny-line"></span> SIMPLES ASSIM</div><h2 id="how-title">Quatro passos.<br /><span>Uma criação com a sua cara.</span></h2></div><div class="steps-grid"><article class="how-step"><span class="how-step-icon" aria-hidden="true">↑</span><span class="how-step-number">01 /</span><h3>Adicione sua foto</h3><p>Escolha uma foto do seu celular ou computador. A imagem fica no seu navegador.</p></article><article class="how-step"><span class="how-step-icon" aria-hidden="true">◎</span><span class="how-step-number">02 /</span><h3>Escolha um candidato</h3><p>Selecione Lula, Renan Santos ou Flávio Bolsonaro.</p></article><article class="how-step"><span class="how-step-icon" aria-hidden="true">✳</span><span class="how-step-number">03 /</span><h3>Escolha a foto do presidente</h3><p>Veja quatro fotos do candidato e escolha a que vai aparecer na arte.</p></article><article class="how-step"><span class="how-step-icon" aria-hidden="true">↓</span><span class="how-step-number">04 /</span><h3>Ajuste e compartilhe</h3><p>Ajuste sua foto, escolha Feed ou Story, e baixe sua criação.</p></article></div></section>
+      <section class="how-section container" id="como-funciona" aria-labelledby="how-title"><div class="how-heading"><div class="section-kicker"><span class="tiny-line"></span> SIMPLES ASSIM</div><h2 id="how-title">Quatro passos.<br /><span>Uma criação com a sua cara.</span></h2></div><div class="steps-grid"><article class="how-step"><span class="how-step-icon" aria-hidden="true">↑</span><span class="how-step-number">01 /</span><h3>Adicione sua foto</h3><p>Escolha uma foto do seu celular ou computador. A montagem é feita no navegador.</p></article><article class="how-step"><span class="how-step-icon" aria-hidden="true">◎</span><span class="how-step-number">02 /</span><h3>Escolha um candidato</h3><p>Selecione Lula, Renan Santos ou Flávio Bolsonaro.</p></article><article class="how-step"><span class="how-step-icon" aria-hidden="true">✳</span><span class="how-step-number">03 /</span><h3>Escolha a foto do presidente</h3><p>Veja quatro fotos do candidato e escolha a que vai aparecer na arte.</p></article><article class="how-step"><span class="how-step-icon" aria-hidden="true">↓</span><span class="how-step-number">04 /</span><h3>Libere sua arte</h3><p>Um Pix de R$ 2 libera o download e o compartilhamento da montagem.</p></article></div></section>
 
       <section class="closing-section"><div class="container closing-inner"><span class="closing-decor" aria-hidden="true">✳</span><div><div class="closing-kicker">SUA FOTO. SUA ESCOLHA. SEU JEITO.</div><h2>Bora criar uma<br />arte com a sua cara?</h2><p>Personalize, baixe e compartilhe sua criação.</p></div><a href="#criar" class="button closing-button">Criar minha arte <span aria-hidden="true">↗</span></a></div></section>
     </main>
 
     <footer class="site-footer"><div class="container footer-inner"><a href="#inicio" class="brand footer-brand"><span class="brand-mark" aria-hidden="true">✳</span><span>meu presidente<span class="brand-dot">.</span></span></a><p>Projeto independente, sem vínculo com a Justiça Eleitoral, candidatos ou partidos.</p><span>© 2026 Meu Presidente</span></div></footer>
+    <dialog class="payment-dialog" id="pix-dialog" aria-labelledby="pix-title">
+      <div class="payment-dialog-card">
+        <header class="payment-dialog-header">
+          <div>
+            <span class="payment-kicker">PAGAMENTO ÚNICO</span>
+            <h2 id="pix-title">Libere sua arte</h2>
+          </div>
+          <button class="dialog-close" id="pix-close-button" type="button" aria-label="Fechar pagamento">×</button>
+        </header>
+
+        <section id="pix-form-panel" class="payment-panel">
+          <p class="payment-intro">Pague <strong>R$ 2,00</strong> por Pix para liberar o download e o compartilhamento desta montagem.</p>
+          <form id="pix-form" novalidate>
+            <label for="pix-email">Seu e-mail</label>
+            <input id="pix-email" name="email" type="email" autocomplete="email" inputmode="email" required maxlength="254" />
+            <label for="pix-cpf">Seu CPF</label>
+            <input id="pix-cpf" name="cpf" type="text" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00" required maxlength="14" />
+            <p class="payment-privacy">E-mail e CPF são enviados ao Mercado Pago para processar o Pix. A montagem fica no navegador até a confirmação; depois, é enviada apenas para liberar o arquivo e não é armazenada.</p>
+            <p id="pix-form-error" class="payment-error" role="alert" hidden></p>
+            <button id="pix-submit-button" class="button button-primary payment-submit" type="submit">Gerar Pix de R$ 2</button>
+          </form>
+        </section>
+
+        <section id="pix-pending-panel" class="payment-panel pix-pending-panel" hidden>
+          <p class="payment-intro">Abra o aplicativo do seu banco e escaneie o QR Code. Você também pode copiar o código Pix.</p>
+          <img id="pix-qr-image" class="pix-qr-image" alt="QR Code Pix de R$ 2,00" />
+          <label id="pix-copy-label" for="pix-copy-code">Pix copia e cola</label>
+          <textarea id="pix-copy-code" class="pix-copy-code" readonly rows="4" aria-label="Código Pix copia e cola"></textarea>
+          <button id="pix-copy-button" class="button button-secondary payment-submit" type="button">Copiar código Pix</button>
+          <p id="pix-status-message" class="pix-status-message" role="status" aria-live="polite">Aguardando a confirmação do pagamento…</p>
+          <p id="pix-expiration" class="payment-privacy"></p>
+          <button id="pix-check-button" class="pix-check-button" type="button">Já paguei, verificar agora</button>
+          <button id="pix-retry-button" class="pix-check-button" type="button" hidden>Gerar outro Pix</button>
+        </section>
+
+        <section id="pix-approved-panel" class="payment-panel pix-approved-panel" hidden>
+          <span class="payment-success-icon" aria-hidden="true">✓</span>
+          <h3>Pagamento confirmado!</h3>
+          <p class="payment-intro">Sua montagem está liberada. Escolha o que deseja fazer.</p>
+          <button id="approved-download-button" class="button button-primary payment-submit" type="button">Baixar minha arte</button>
+          <button id="approved-share-button" class="button button-secondary payment-submit" type="button">Compartilhar minha arte</button>
+        </section>
+      </div>
+    </dialog>
+    <script src="payment-config.js"></script>
     <div class="visually-hidden" id="live-status" aria-live="polite" aria-atomic="true"></div><div id="toast" class="toast" role="status" hidden></div>
   </body>
 </html>

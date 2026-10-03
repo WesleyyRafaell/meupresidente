@@ -36,7 +36,7 @@ const elements = Object.fromEntries(
     "candidate-grid", "president-photo-grid", "format-toggle",
     "zoom", "zoom-label", "position", "position-label", "preview-stage",
     "preview-canvas", "preview-title", "preview-subtitle", "download-button",
-    "download-label", "share-button", "share-label", "live-status", "toast",
+    "download-label", "share-button", "share-label", "payment-note-copy", "live-status", "toast",
     "pix-dialog", "pix-close-button", "pix-form", "pix-form-panel", "pix-email",
     "pix-cpf", "pix-submit-button", "pix-form-error", "pix-pending-panel",
     "pix-qr-image", "pix-copy-label", "pix-copy-code", "pix-copy-button", "pix-status-message",
@@ -59,6 +59,7 @@ const state = {
   paymentPollTimer: 0,
   paymentPollStartedAt: 0,
   paymentPollInFlight: false,
+  previewUnlocked: false,
 };
 
 const presidentPhotoCache = new Map();
@@ -155,9 +156,13 @@ function announce(message) {
 function setPaymentButtonLabels(unlocked = false) {
   elements["download-label"].textContent = unlocked ? "Baixar minha arte" : "Baixar por R$ 2";
   elements["share-label"].textContent = unlocked ? "↗ Compartilhar minha arte" : "↗ Compartilhar por R$ 2";
+  elements["payment-note-copy"].textContent = unlocked
+    ? "Pagamento confirmado. A montagem está liberada sem marca d’água."
+    : "A prévia tem marca d’água. Após a confirmação do Pix, a montagem fica limpa para baixar e compartilhar.";
 }
 
 function markCompositionChanged() {
+  state.previewUnlocked = false;
   setPaymentButtonLabels(false);
 }
 
@@ -490,10 +495,52 @@ function drawArtwork(canvas, { fullSize = false } = {}) {
   ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, width - ctx.lineWidth, height - ctx.lineWidth);
 }
 
+function drawPreviewWatermark(canvas) {
+  const ctx = canvas.getContext("2d");
+  if (!ctx || !canvas.width || !canvas.height) return;
+
+  const watermark = "fotocommeupresidente";
+  const diagonal = Math.hypot(canvas.width, canvas.height);
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.rotate(-Math.PI / 6);
+
+  ctx.globalAlpha = 0.11;
+  ctx.strokeStyle = "#fff";
+  ctx.lineWidth = 1.25;
+  for (let x = -diagonal; x <= diagonal; x += 38) {
+    ctx.beginPath();
+    ctx.moveTo(x, -diagonal);
+    ctx.lineTo(x, diagonal);
+    ctx.stroke();
+  }
+  for (let y = -diagonal; y <= diagonal; y += 38) {
+    ctx.beginPath();
+    ctx.moveTo(-diagonal, y);
+    ctx.lineTo(diagonal, y);
+    ctx.stroke();
+  }
+
+  ctx.globalAlpha = 0.24;
+  ctx.fillStyle = "#fff";
+  ctx.font = '700 22px "DM Sans", Arial, sans-serif';
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (let y = -diagonal; y <= diagonal; y += 104) {
+    for (let x = -diagonal; x <= diagonal; x += 240) {
+      ctx.fillText(watermark, x, y);
+    }
+  }
+  ctx.restore();
+}
+
 function updatePreview() {
   const story = state.format === "story";
   elements["preview-stage"].classList.toggle("is-story", story);
   drawArtwork(elements["preview-canvas"]);
+  if (!state.previewUnlocked) drawPreviewWatermark(elements["preview-canvas"]);
   const candidate = candidateByNumber(state.selected);
   const presidentPhotoReady = Boolean(state.presidentPhoto && presidentPhotoCache.has(state.presidentPhoto));
   elements["preview-title"].textContent = candidate ? `Sua criação para ${candidate.name}` : "Uma arte feita por você";
@@ -640,7 +687,9 @@ function showApprovedPix() {
   elements["pix-form-panel"].hidden = true;
   elements["pix-pending-panel"].hidden = true;
   elements["pix-approved-panel"].hidden = false;
+  state.previewUnlocked = true;
   setPaymentButtonLabels(true);
+  updatePreview();
   announce("Pix confirmado. Download e compartilhamento liberados para esta montagem.");
 }
 
@@ -830,7 +879,9 @@ async function fetchApprovedArtwork(artifact, order) {
     if (response.status === 402 || response.status === 403) {
       order.status = "rejected";
       savePaymentOrders();
+      state.previewUnlocked = false;
       setPaymentButtonLabels(false);
+      updatePreview();
     }
     throw new Error(data.error || "Não foi possível exportar a imagem. Tente novamente.");
   }
@@ -874,7 +925,9 @@ async function handleProtectedAction(action) {
     const order = state.paymentOrders.get(artifact.hash);
 
     if (order?.status === "approved") {
+      state.previewUnlocked = true;
       setPaymentButtonLabels(true);
+      updatePreview();
       await performPaidAction(action, artifact, order);
       return;
     }

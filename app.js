@@ -41,7 +41,9 @@ const elements = Object.fromEntries(
     "pix-cpf", "pix-submit-button", "pix-form-error", "pix-pending-panel",
     "pix-qr-image", "pix-copy-label", "pix-copy-code", "pix-copy-button", "pix-status-message",
     "pix-expiration", "pix-check-button", "pix-retry-button", "pix-approved-panel",
-    "approved-download-button", "approved-share-button",
+    "approved-artwork-status", "approved-retry-button", "approved-download-button", "approved-share-button",
+    "pix-delivery-panel", "pix-delivery-image", "pix-delivery-status",
+    "pix-delivery-download-button", "pix-delivery-share-button", "pix-delivery-back-button",
   ].map((id) => [id, document.getElementById(id)]),
 );
 
@@ -60,6 +62,8 @@ const state = {
   paymentPollStartedAt: 0,
   paymentPollInFlight: false,
   previewUnlocked: false,
+  approvedArtwork: null,
+  approvedArtworkRequest: null,
 };
 
 const presidentPhotoCache = new Map();
@@ -651,10 +655,18 @@ function stopPaymentPolling() {
   state.paymentPollTimer = 0;
 }
 
+function releaseApprovedArtwork() {
+  if (state.approvedArtwork?.objectUrl) URL.revokeObjectURL(state.approvedArtwork.objectUrl);
+  state.approvedArtwork = null;
+  state.approvedArtworkRequest = null;
+  elements["pix-delivery-image"].removeAttribute("src");
+}
+
 function showPixForm(message = "") {
   elements["pix-form-panel"].hidden = false;
   elements["pix-pending-panel"].hidden = true;
   elements["pix-approved-panel"].hidden = true;
+  elements["pix-delivery-panel"].hidden = true;
   elements["pix-form-error"].textContent = message;
   elements["pix-form-error"].hidden = !message;
 }
@@ -663,6 +675,7 @@ function showPendingPix(order) {
   elements["pix-form-panel"].hidden = true;
   elements["pix-pending-panel"].hidden = false;
   elements["pix-approved-panel"].hidden = true;
+  elements["pix-delivery-panel"].hidden = true;
   const hasQr = Boolean(order.qrCodeBase64 && order.qrCode);
   elements["pix-qr-image"].hidden = !hasQr;
   elements["pix-copy-label"].hidden = !hasQr;
@@ -687,10 +700,17 @@ function showApprovedPix() {
   elements["pix-form-panel"].hidden = true;
   elements["pix-pending-panel"].hidden = true;
   elements["pix-approved-panel"].hidden = false;
+  elements["pix-delivery-panel"].hidden = true;
+  elements["approved-artwork-status"].textContent = "Preparando sua arte para salvar e compartilhar…";
+  elements["approved-artwork-status"].hidden = false;
+  elements["approved-retry-button"].hidden = true;
+  elements["approved-download-button"].disabled = true;
+  elements["approved-share-button"].disabled = true;
   state.previewUnlocked = true;
   setPaymentButtonLabels(true);
   updatePreview();
   announce("Pix confirmado. Download e compartilhamento liberados para esta montagem.");
+  void prepareApprovedArtwork();
 }
 
 function showPixDialog(artifact) {
@@ -699,6 +719,7 @@ function showPixDialog(artifact) {
     return false;
   }
 
+  if (state.currentCheckout?.artifact.hash !== artifact.hash) releaseApprovedArtwork();
   state.currentCheckout = { artifact };
   let order = state.paymentOrders.get(artifact.hash);
 
@@ -852,15 +873,13 @@ async function createPixPayment(event) {
   }
 }
 
-function downloadBlob(blob, artifact) {
-  const objectUrl = URL.createObjectURL(blob);
+function downloadBlob(approvedArtwork) {
   const link = document.createElement("a");
-  link.href = objectUrl;
-  link.download = "meu-presidente-" + artifact.candidate.number + "-" + artifact.format + ".png";
+  link.href = approvedArtwork.objectUrl;
+  link.download = approvedArtwork.fileName;
   document.body.append(link);
   link.click();
   link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 2000);
 }
 
 async function fetchApprovedArtwork(artifact, order) {
@@ -888,31 +907,150 @@ async function fetchApprovedArtwork(artifact, order) {
   return response.blob();
 }
 
-async function performPaidAction(action, artifact, order) {
-  const verifiedBlob = await fetchApprovedArtwork(artifact, order);
-  if (action === "share" && navigator.share && navigator.canShare) {
-    const fileName = "meu-presidente-" + artifact.candidate.number + "-" + artifact.format + ".png";
-    const file = new File([verifiedBlob], fileName, { type: "image/png" });
-    if (navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({
-          files: [file],
-          title: "Minha arte · " + artifact.candidate.name,
-          text: "Minha escolha, do meu jeito.",
-        });
-        announce("Arte pronta para compartilhar.");
-        return true;
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") return false;
+async function prepareApprovedArtwork() {
+  const checkout = state.currentCheckout;
+  if (!checkout) return;
+
+  const artifact = checkout.artifact;
+  const hash = artifact.hash;
+  const order = state.paymentOrders.get(hash);
+  if (!order?.paymentId || order.status !== "approved") return;
+
+  if (state.approvedArtwork?.hash === hash) {
+    elements["approved-artwork-status"].textContent = "Sua arte está pronta.";
+    elements["approved-artwork-status"].hidden = false;
+    elements["approved-download-button"].disabled = false;
+    elements["approved-share-button"].disabled = false;
+    return state.approvedArtwork;
+  }
+  if (state.approvedArtworkRequest?.hash === hash) return state.approvedArtworkRequest.promise;
+
+  releaseApprovedArtwork();
+  const request = { hash, promise: null };
+  state.approvedArtworkRequest = request;
+  elements["approved-artwork-status"].textContent = "Preparando sua arte para salvar e compartilhar…";
+  elements["approved-artwork-status"].hidden = false;
+  elements["approved-retry-button"].hidden = true;
+  elements["approved-download-button"].disabled = true;
+  elements["approved-share-button"].disabled = true;
+
+  request.promise = (async () => {
+    try {
+      const blob = await fetchApprovedArtwork(artifact, order);
+      if (state.approvedArtworkRequest !== request
+        || state.currentCheckout?.artifact.hash !== hash
+        || !elements["pix-dialog"].open) return null;
+
+      const fileName = "meu-presidente-" + artifact.candidate.number + "-" + artifact.format + ".png";
+      let file = null;
+      if (typeof File === "function") {
+        try {
+          file = new File([blob], fileName, { type: "image/png" });
+        } catch {
+          // The image can still be saved from the in-page preview.
+        }
       }
+      const objectUrl = URL.createObjectURL(blob);
+      state.approvedArtwork = { hash, blob, file, fileName, objectUrl };
+      elements["pix-delivery-image"].src = objectUrl;
+      elements["approved-artwork-status"].textContent = "Sua arte está pronta. Escolha salvar ou compartilhar.";
+      elements["approved-download-button"].disabled = false;
+      elements["approved-share-button"].disabled = false;
+      return state.approvedArtwork;
+    } catch {
+      if (state.approvedArtworkRequest !== request
+        || state.currentCheckout?.artifact.hash !== hash
+        || !elements["pix-dialog"].open) return null;
+
+      if (order.status === "rejected") {
+        showPixForm("Não foi possível validar este pagamento. Verifique o Pix ou gere uma nova cobrança.");
+      } else {
+        elements["approved-artwork-status"].textContent = "Não foi possível preparar a imagem agora. Tente novamente.";
+        elements["approved-retry-button"].hidden = false;
+      }
+      return null;
+    } finally {
+      if (state.approvedArtworkRequest === request) state.approvedArtworkRequest = null;
     }
+  })();
+
+  return request.promise;
+}
+
+function canShareApprovedArtwork(approvedArtwork) {
+  if (!approvedArtwork?.file || typeof navigator.share !== "function") return false;
+  if (typeof navigator.canShare !== "function") return true;
+  try {
+    return navigator.canShare({ files: [approvedArtwork.file] });
+  } catch {
+    return false;
+  }
+}
+
+function showPixDelivery(message) {
+  const approvedArtwork = state.approvedArtwork;
+  if (!approvedArtwork) return;
+
+  elements["pix-approved-panel"].hidden = true;
+  elements["pix-delivery-panel"].hidden = false;
+  elements["pix-delivery-image"].src = approvedArtwork.objectUrl;
+  elements["pix-delivery-status"].textContent = message;
+  elements["pix-delivery-share-button"].hidden = !canShareApprovedArtwork(approvedArtwork);
+}
+
+function saveApprovedArtwork() {
+  const approvedArtwork = state.approvedArtwork;
+  if (!approvedArtwork) return;
+  try {
+    downloadBlob(approvedArtwork);
+    showPixDelivery("Se o arquivo não aparecer em Downloads ou Fotos, toque e segure a imagem para salvá-la. Você continua no Facebook.");
+  } catch {
+    showPixDelivery("O download não abriu. Toque e segure a imagem para salvá-la no celular; você continua no Facebook.");
+  }
+}
+
+function performApprovedDialogAction(action) {
+  const checkout = state.currentCheckout;
+  const approvedArtwork = state.approvedArtwork;
+  if (!checkout || !approvedArtwork || approvedArtwork.hash !== checkout.artifact.hash) {
+    announce("Aguarde enquanto preparamos sua arte.");
+    return;
   }
 
-  downloadBlob(verifiedBlob, artifact);
-  announce(action === "share"
-    ? "Arte baixada. Compartilhe pelo aplicativo que preferir."
-    : "Arte " + FORMATS[artifact.format].label + " baixada em PNG.");
-  return true;
+  if (action === "download") {
+    saveApprovedArtwork();
+    return;
+  }
+
+  if (!canShareApprovedArtwork(approvedArtwork)) {
+    showPixDelivery("Este navegador não abriu o compartilhamento. Toque e segure a imagem para salvá-la no celular; depois, compartilhe pelo Facebook.");
+    return;
+  }
+
+  const shareButton = elements["pix-delivery-panel"].hidden
+    ? elements["approved-share-button"]
+    : elements["pix-delivery-share-button"];
+  let sharePromise;
+  try {
+    sharePromise = navigator.share({
+      files: [approvedArtwork.file],
+      title: "Minha arte · " + checkout.artifact.candidate.name,
+      text: "Minha escolha, do meu jeito.",
+    });
+  } catch {
+    showPixDelivery("O compartilhamento não abriu neste navegador. Toque e segure a imagem para salvá-la e compartilhe pelo Facebook.");
+    return;
+  }
+
+  shareButton.disabled = true;
+  Promise.resolve(sharePromise).then(() => {
+    announce("Compartilhamento concluído.");
+    if (elements["pix-dialog"].open) elements["pix-dialog"].close();
+  }).catch((error) => {
+    shareButton.disabled = false;
+    if (error?.name === "AbortError") return;
+    showPixDelivery("O compartilhamento não abriu neste navegador. Toque e segure a imagem para salvá-la e compartilhe pelo Facebook.");
+  });
 }
 
 async function handleProtectedAction(action) {
@@ -925,10 +1063,7 @@ async function handleProtectedAction(action) {
     const order = state.paymentOrders.get(artifact.hash);
 
     if (order?.status === "approved") {
-      state.previewUnlocked = true;
-      setPaymentButtonLabels(true);
-      updatePreview();
-      await performPaidAction(action, artifact, order);
+      showPixDialog(artifact);
       return;
     }
     if (order && ["rejected", "cancelled", "expired", "refunded", "charged_back"].includes(order.status)) {
@@ -942,33 +1077,6 @@ async function handleProtectedAction(action) {
   } finally {
     button.disabled = false;
     updatePreview();
-  }
-}
-
-async function performApprovedDialogAction(action) {
-  const checkout = state.currentCheckout;
-  if (!checkout) return;
-  const button = action === "download"
-    ? elements["approved-download-button"]
-    : elements["approved-share-button"];
-  const order = state.paymentOrders.get(checkout.artifact.hash);
-  if (!order?.paymentId || order.status !== "approved") {
-    announce("Não foi possível confirmar a liberação. Verifique o Pix novamente.");
-    return;
-  }
-
-  button.disabled = true;
-  try {
-    const succeeded = await performPaidAction(action, checkout.artifact, order);
-    if (succeeded && elements["pix-dialog"].open) elements["pix-dialog"].close();
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") return;
-    if (order.status === "rejected") {
-      showPixForm("Não foi possível validar este pagamento. Você pode gerar um novo Pix para a montagem.");
-    }
-    announce(error.message || "Não foi possível exportar a imagem. Tente novamente.");
-  } finally {
-    button.disabled = false;
   }
 }
 
@@ -1047,9 +1155,19 @@ elements["pix-check-button"].addEventListener("click", () => {
 });
 elements["pix-retry-button"].addEventListener("click", retryPixPayment);
 elements["pix-close-button"].addEventListener("click", () => elements["pix-dialog"].close());
-elements["pix-dialog"].addEventListener("close", stopPaymentPolling);
+elements["pix-dialog"].addEventListener("close", () => {
+  stopPaymentPolling();
+  releaseApprovedArtwork();
+});
+elements["approved-retry-button"].addEventListener("click", () => { void prepareApprovedArtwork(); });
 elements["approved-download-button"].addEventListener("click", () => performApprovedDialogAction("download"));
 elements["approved-share-button"].addEventListener("click", () => performApprovedDialogAction("share"));
+elements["pix-delivery-download-button"].addEventListener("click", saveApprovedArtwork);
+elements["pix-delivery-share-button"].addEventListener("click", () => performApprovedDialogAction("share"));
+elements["pix-delivery-back-button"].addEventListener("click", () => {
+  elements["pix-delivery-panel"].hidden = true;
+  elements["pix-approved-panel"].hidden = false;
+});
 
 readSavedState();
 readSavedPaymentOrders();
@@ -1057,4 +1175,5 @@ if (state.presidentPhoto) ensurePresidentPhotoLoaded(state.presidentPhoto);
 renderAll();
 window.addEventListener("beforeunload", () => {
   if (state.photoObjectUrl) URL.revokeObjectURL(state.photoObjectUrl);
+  releaseApprovedArtwork();
 });

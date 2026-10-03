@@ -155,8 +155,19 @@
           <span class="payment-success-icon" aria-hidden="true">✓</span>
           <h3>Pagamento confirmado!</h3>
           <p class="payment-intro">Sua montagem está liberada. Escolha o que deseja fazer.</p>
+          <p id="approved-artwork-status" class="pix-status-message" role="status" aria-live="polite">Preparando sua arte para salvar e compartilhar…</p>
+          <button id="approved-retry-button" class="pix-check-button" type="button" hidden>Tentar preparar novamente</button>
           <button id="approved-download-button" class="button button-primary payment-submit" type="button">Baixar minha arte</button>
           <button id="approved-share-button" class="button button-secondary payment-submit" type="button">Compartilhar minha arte</button>
+        </section>
+
+        <section id="pix-delivery-panel" class="payment-panel pix-delivery-panel" hidden>
+          <h3>Sua arte está pronta</h3>
+          <p id="pix-delivery-status" class="pix-delivery-status" role="status" aria-live="polite">Toque e segure a imagem para salvá-la no celular.</p>
+          <img id="pix-delivery-image" class="pix-delivery-image" alt="Sua montagem sem marca d’água, pronta para salvar ou compartilhar" />
+          <button id="pix-delivery-download-button" class="button button-primary payment-submit" type="button">Tentar baixar novamente</button>
+          <button id="pix-delivery-share-button" class="button button-secondary payment-submit" type="button">Compartilhar minha arte</button>
+          <button id="pix-delivery-back-button" class="pix-check-button" type="button">Voltar às opções</button>
         </section>
       </div>
     </dialog>

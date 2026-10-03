@@ -228,6 +228,12 @@ a { color: inherit; text-decoration: none; }
 .pix-approved-panel h3 { margin: 0 0 10px; color: #1e4e35; font: 750 25px/1.2 Outfit, Arial, sans-serif; }
 .pix-approved-panel .button-secondary { margin-top: 9px; }
 .pix-approved-panel .button-primary { margin-top: 0; }
+.pix-delivery-panel { text-align: center; }
+.pix-delivery-panel h3 { margin: 0 0 9px; color: #1e4e35; font: 750 25px/1.2 Outfit, Arial, sans-serif; }
+.pix-delivery-status { margin: 0 0 12px; color: #596c5e; font-size: 15px; line-height: 1.5; }
+.pix-delivery-image { display: block; width: min(100%, 350px); max-height: 38vh; margin: 0 auto 14px; border: 1px solid #e3e9df; border-radius: 10px; background: #f5f7f2; object-fit: contain; }
+.pix-delivery-panel .payment-submit { margin-top: 8px; }
+.pix-delivery-panel .pix-check-button { display: block; width: 100%; }
 
 @media (max-width: 1050px) {
   .container { width: min(100% - 56px, 1200px); }

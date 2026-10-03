@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f8f7f2" />
+    <meta name="description" content="Crie grátis uma arte com a sua foto, moldura e candidato à Presidência da sua escolha." />
+    <title>Meu Presidente — Sua foto, sua escolha</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header class="site-header" id="inicio">
+      <div class="container header-inner">
+        <a class="brand" href="#inicio" aria-label="Meu Presidente, início">
+          <span class="brand-mark" aria-hidden="true">✳</span>
+          <span>meu presidente<span class="brand-dot">.</span></span>
+        </a>
+        <nav class="header-nav" aria-label="Navegação principal">
+          <a href="#criar">Criar minha arte</a>
+        </nav>
+        <a class="header-cta" href="#criar">Começar agora <span aria-hidden="true">↗</span></a>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero container" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <h1 id="hero-title">Poste uma foto.<br />Com o seu.<br /><span>Presidente.</span></h1>
+          <p class="hero-description">Monte uma arte com sua foto e a foto do seu candidato à Presidência. Deixe claro sua intenção de voto e ajude a campanha do seu presidente.</p>
+          <div class="hero-actions">
+            <a class="button button-dark" href="#criar">Criar minha arte <span aria-hidden="true">↗</span></a>
+          </div>
+          <div class="hero-perks">
+          </div>
+        </div>
+
+        <div class="hero-art" aria-label="Exemplo de foto dentro de uma moldura verde e amarela">
+          <div class="hero-art-back" aria-hidden="true"><span>✳</span></div>
+          <div class="hero-photo-frame">
+            <img src="assets/colagem.png" alt="Retrato de exemplo" />
+          </div>
+         
+        </div>
+      </section>
+
+      
+
+      <section class="studio-section" id="criar" aria-labelledby="studio-title">
+        <div class="container">
+          <div class="section-heading">
+            <h2 id="studio-title">Agora é com <em>você.</em></h2></div>
+            <p>Sua foto, uma candidatura à Presidência e uma moldura que combina com você.</p>
+          </div>
+
+          <div class="studio-grid">
+            <section class="editor-panel" aria-label="Personalize sua arte">
+              <div class="editor-heading"><span class="editor-heading-icon" aria-hidden="true">✳</span><div><h3>Monte sua arte</h3><p>Personalize cada detalhe em poucos passos.</p></div></div>
+
+              <div class="editor-divider"></div>
+              <section class="field-group" aria-labelledby="upload-title">
+                <div class="field-title"><span class="step-number">01</span><div><h4 id="upload-title">Sua foto</h4><p>A imagem é processada no seu navegador.</p></div></div>
+                <input id="photo-input" class="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" />
+                <button id="upload-zone" class="upload-zone" type="button">
+                  <span class="upload-icon" aria-hidden="true">↑</span>
+                  <span class="upload-copy"><strong id="upload-label">Escolha ou arraste uma foto</strong><small id="upload-description">JPG, PNG ou WebP · até 20 MB</small></span>
+                  <span class="upload-arrow" aria-hidden="true">↗</span>
+                </button>
+              </section>
+
+              <div class="editor-divider"></div>
+              <section class="field-group" aria-labelledby="candidate-title">
+                <div class="field-title"><span class="step-number">02</span><div><h4 id="candidate-title">Escolha um candidato</h4><p>Esta demonstração inclui somente três nomes.</p></div></div>
+                <div id="candidate-grid" class="candidate-grid" role="group" aria-label="Candidatos à Presidência"></div>
+                <p class="source-note">Lista demonstrativa limitada a Lula, Renan Santos e Flávio Bolsonaro; não representa uma lista oficial do TSE.</p>
+              </section>
+
+              <div class="editor-divider"></div>
+              <section class="field-group" aria-labelledby="president-photo-title">
+                <div class="field-title"><span class="step-number">03</span><div><h4 id="president-photo-title">Escolha a foto do seu presidente</h4><p>Quatro opções para o candidato escolhido.</p></div></div>
+                <div id="president-photo-grid" class="president-photo-grid" role="group" aria-label="Fotos do presidente"></div>
+              </section>
+
+              <div class="editor-divider"></div>
+              <section class="field-group last-field" aria-labelledby="format-title">
+                <div class="field-title"><span class="step-number">04</span><div><h4 id="format-title">Formato e enquadramento</h4><p>Ajuste sua foto e escolha onde compartilhar.</p></div></div>
+                <div id="format-toggle" class="format-toggle" role="group" aria-label="Formato da imagem">
+                  <button class="active" type="button" data-format="feed" aria-pressed="true"><span class="format-icon feed-icon"></span> Feed <small>4:5</small></button>
+                  <button type="button" data-format="story" aria-pressed="false"><span class="format-icon story-icon"></span> Story <small>9:16</small></button>
+                </div>
+                <div class="adjustments"><label for="zoom">Zoom <span id="zoom-label">100%</span></label><input id="zoom" type="range" min="100" max="150" value="100" aria-label="Ajustar zoom" /><label for="position">Posição vertical <span id="position-label">Centro</span></label><input id="position" type="range" min="-100" max="100" value="0" aria-label="Ajustar posição vertical" /></div>
+              </section>
+            </section>
+
+            <section class="preview-panel" aria-label="Prévia da arte">
+              <div class="preview-top"><div><span class="preview-eyebrow"><span class="live-dot"></span> ATUALIZA EM TEMPO REAL</span><h3>Olha como ficou!</h3></div><span class="preview-label">PRÉVIA</span></div>
+              <div id="preview-stage" class="preview-stage"><span class="preview-ring ring-one"></span><span class="preview-ring ring-two"></span><div class="preview-art"><canvas id="preview-canvas" class="preview-canvas" aria-label="Prévia da arte personalizada"></canvas></div><span class="stage-star star-one" aria-hidden="true">✳</span><span class="stage-star star-two" aria-hidden="true">✳</span></div>
+              <div class="preview-bottom">
+                <div class="preview-summary"><span class="summary-icon" aria-hidden="true">✦</span><span><strong id="preview-title">Uma arte feita por você</strong><small id="preview-subtitle">Adicione uma foto para começar.</small></span></div>
+                <button id="download-button" class="button button-primary checkout-button" type="button" disabled>Baixar minha arte <span aria-hidden="true">↓</span></button>
+                <div class="secondary-actions"><button id="share-button" type="button" disabled>↗ Compartilhar</button></div>
+                <p class="disclaimer">Criação pessoal. Não é comprovante de voto.</p>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section class="how-section container" id="como-funciona" aria-labelledby="how-title"><div class="how-heading"><div class="section-kicker"><span class="tiny-line"></span> SIMPLES ASSIM</div><h2 id="how-title">Quatro passos.<br /><span>Uma criação com a sua cara.</span></h2></div><div class="steps-grid"><article class="how-step"><span class="how-step-icon" aria-hidden="true">↑</span><span class="how-step-number">01 /</span><h3>Adicione sua foto</h3><p>Escolha uma foto do seu celular ou computador. A imagem fica no seu navegador.</p></article><article class="how-step"><span class="how-step-icon" aria-hidden="true">◎</span><span class="how-step-number">02 /</span><h3>Escolha um candidato</h3><p>Selecione Lula, Renan Santos ou Flávio Bolsonaro.</p></article><article class="how-step"><span class="how-step-icon" aria-hidden="true">✳</span><span class="how-step-number">03 /</span><h3>Escolha a foto do presidente</h3><p>Veja quatro fotos do candidato e escolha a que vai aparecer na arte.</p></article><article class="how-step"><span class="how-step-icon" aria-hidden="true">↓</span><span class="how-step-number">04 /</span><h3>Ajuste e compartilhe</h3><p>Ajuste sua foto, escolha Feed ou Story, e baixe sua criação.</p></article></div></section>
+
+      <section class="closing-section"><div class="container closing-inner"><span class="closing-decor" aria-hidden="true">✳</span><div><div class="closing-kicker">SUA FOTO. SUA ESCOLHA. SEU JEITO.</div><h2>Bora criar uma<br />arte com a sua cara?</h2><p>Personalize, baixe e compartilhe sua criação.</p></div><a href="#criar" class="button closing-button">Criar minha arte <span aria-hidden="true">↗</span></a></div></section>
+    </main>
+
+    <footer class="site-footer"><div class="container footer-inner"><a href="#inicio" class="brand footer-brand"><span class="brand-mark" aria-hidden="true">✳</span><span>meu presidente<span class="brand-dot">.</span></span></a><p>Projeto independente, sem vínculo com a Justiça Eleitoral, candidatos ou partidos.</p><span>© 2026 Meu Presidente</span></div></footer>
+    <div class="visually-hidden" id="live-status" aria-live="polite" aria-atomic="true"></div><div id="toast" class="toast" role="status" hidden></div>
+  </body>
+</html>
